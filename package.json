@@ -1,0 +1,23 @@
+{
+  "name": "logoot-crdt",
+  "version": "1.2.0",
+  "description": "Logoot CRDT implementation.",
+  "main": "src/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "standard --fix src/** && tape test/*.js",
+    "build": "browserify src/index.js -s Logoot -o dist/logoot.js"
+  },
+  "author": "Thomas Mullen",
+  "license": "MIT",
+  "dependencies": {
+    "inherits": "^2.0.3",
+    "nanobus": "^4.3.4"
+  },
+  "devDependencies": {
+    "standard": "^8.6.0",
+    "tape": "^4.6.3"
+  }
+}
