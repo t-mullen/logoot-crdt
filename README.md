@@ -68,7 +68,7 @@ Replaces all text with the given value.
 Returns the current state of the CRDT. Can be passed into the constructor of another sequence to transfer state or into `setState()`.
 
 ### `doc.setState(state)`
-Sets the current state of the CRDT. Equivalent to constructing a new instance.
+Sets the current state of the CRDT. Equivalent to constructing a new instance with the given state.
 
 Changing the state is unsafe; edits may have been made while you are transfering state that will need to be integrated. The best way to handle this is a two-step sync:
 
@@ -77,16 +77,16 @@ var state = l1.getState()
 var missedOperations = []
 network.on('operation', (op) => {
   l1.receive(op)
-  missedOperations.push(op) // save this to send to w2 later
+  missedOperations.push(op) // save this to send to l2 later
 })
 
-// send state to w2 (w2 is not receiving any operations until now)
+// send state to l2 (l2 is not receiving any operations until now)
 l2.setState(state)
-network.on('operation', op => { // w2 can now receive operations
+network.on('operation', op => { // l2 can now receive operations
   l2.receive(op)
 })
 
-// then send all the operations w2 missed during sync (don't worry about duplicates)
+// then send all the operations l2 missed during sync (don't worry about duplicates)
 missedOperations.forEach(op => l2.receive(op))
 
 // both peers are now safely synced
