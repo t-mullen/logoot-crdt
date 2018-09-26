@@ -71,33 +71,32 @@ Logoot.prototype._insert = function (value, index) {
   self.emit('operation', { type: 'insert', line })
 }
 
+// get random integer in (exclusive) range [a,b]
 function randomInt (a, b) {
-  return Math.floor(Math.random() * (b - a)) + a
+  return Math.floor(Math.random() * (b - (a + 1))) + a + 1
 }
 
 Logoot.prototype._generateLine = function (prev, next, value) {
   const self = this
 
   // first, find the common prefix of both position identifiers
-  const newPosition = []
-  var index = 0
+  var newPosition = []
 
-  while (prev.pos.ids[index].compare(next.pos.ids[index]) === 0) {
-    newPosition.push(prev.pos.ids[index])
-    index++
-  }
+  var maxLength = Math.max(prev.pos.ids.length, next.pos.ids.length)
 
-  const prevId = prev.pos.ids[index]
-  const nextId = next.pos.ids[index]
-  const diff = nextId.int - prevId.int
+  for (var index = 0; index < maxLength + 1; index++) {
+    const prevId = prev.pos.ids[index] || new Identifier(MIN, null)
+    const nextId = next.pos.ids[index] || new Identifier(MAX, null)
 
-  if (diff > 1) { // enough room for integer between prevInt and nextInt
-    newPosition.push(new Identifier(randomInt(prevId.int, nextId.int), self.site))
-  } else if (diff === 1 && self.site > prevId.site) { // same, but site offers more room
-    newPosition.push(new Identifier(prevId.int, self.site))
-  } else { // no room, need to add a new id
-    newPosition.push(prevId)
-    newPosition.push(new Identifier(randomInt(MIN, MAX), self.site))
+    const diff = nextId.int - prevId.int
+
+    if (diff > 1) { // enough room for integer between prevInt and nextInt
+      newPosition.push(new Identifier(randomInt(prevId.int, nextId.int), self.site))
+    } else if (diff === 1 && self.site > prevId.site) { // same, but site offers more room
+      newPosition.push(new Identifier(prevId.int, self.site))
+    } else { // no room, need to add a new id
+      newPosition.push(prevId)
+    }
   }
 
   return new Line(new Position(newPosition), ++self._clock, value)

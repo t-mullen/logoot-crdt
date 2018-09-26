@@ -46,6 +46,19 @@ function makeNodesWithDelay (n) {
   return nodes
 }
 
+test('single inserter', function (t) {
+  var nodes = makeNodes(1)
+
+  var w1 = nodes[0] 
+  
+  w1.insert('abc', 0)
+  w1.insert('123', 0)
+  
+  t.equals(w1.value(), '123abc')
+  
+  t.end()
+})
+
 test('test insert', function (t) {
   var nodes = makeNodes(2)
 
@@ -244,64 +257,19 @@ test('state transfer', function (t) {
   t.end()
 })
 
-/*
-// LOGOOT does not support these network properties
-test('more-than-once delivery', function (t) {
-  var w1 = new Logoot('site1')
-  var w2 = new Logoot('site2')
 
+test('test left-to-right edit performance', function (t) {
+  var w1 = new Logoot('site1')
+
+  var maxIDLength = 0
   w1.on('operation', (op) => {
-    for (var i=0; i<10; i++) {
-      w2.receive(op)
-    }
-  })
-  w2.on('operation', (op) => {
-    for (var i=0; i<10; i++) {
-      w1.receive(op)
-    }
+    maxIDLength = Math.max(maxIDLength, op.line.pos.ids.length)
   })
   
-  w1.insert('abc', 0)
-  w2.delete(0, 2)
-  w1.insert('123', 1)
-  w2.replaceRange('m', 0, 2)
+  for (var i=0; i < 100; i++) {
+    w1.insert('abc', i)
+  }
 
-  t.equals(w1.value(), w2.value())
-  t.equals(w1.value(), 'm23')
+  console.log('Max identifier length:', maxIDLength)
   t.end()
 })
-
-test('out-of-order delivery', function (t) {
-  var w1 = new Logoot('site1')
-  var w2 = new Logoot('site2')
-
-  var reverseQueue1 = []
-  w1.on('operation', (op) => {
-    reverseQueue1.push(op)
-    if (reverseQueue1.length > 1) {
-      w2.receive(reverseQueue1.pop())
-    }
-  })
-
-  var reverseQueue2 = []
-  w2.on('operation', (op) => {
-    reverseQueue2.push(op)
-    if (reverseQueue2.length > 1) {
-      w1.receive(reverseQueue2.pop())
-    }
-  })
-  
-  w1.insert('abc', 0)
-  w2.delete(0, 2)
-  w1.insert('123', 1)
-  w2.replaceRange('m', 0, 2)
-
-  // clear queue
-  reverseQueue1.forEach(op => w2.receive(op))
-  reverseQueue2.forEach(op => w1.receive(op))
-
-  t.equals(w1.value(), w2.value())
-  t.equals(w1.value(), 'a123bcm')
-  t.end()
-})
-*/
