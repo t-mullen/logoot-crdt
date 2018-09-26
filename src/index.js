@@ -10,13 +10,14 @@ inherits(Logoot, EventEmitter)
 const MIN = -Number.MAX_SAFE_INTEGER
 const MAX = Number.MAX_SAFE_INTEGER
 
-function Logoot (site, state) {
+function Logoot (site, state, bias) {
   var self = this
 
   EventEmitter.call(self)
 
   self.site = site
   self._clock = 0
+  self._bias = bias || 15
   self._lines = [
     new Line(new Position([new Identifier(MIN, null)]), null, null),
     new Line(new Position([new Identifier(MAX, null)]), null, null)
@@ -71,9 +72,12 @@ Logoot.prototype._insert = function (value, index) {
   self.emit('operation', { type: 'insert', line })
 }
 
-// get random integer in (exclusive) range [a,b]
-function randomInt (a, b) {
-  return Math.floor(Math.random() * (b - (a + 1))) + a + 1
+// get random integer in (exclusive) range [a, b] with a linear bias
+// Closer to 0 will provide better perfromance when edits are at start of document
+// 1 is random allocation strategy
+// Above 1 will provide better performance when edits are subsequent (usually the case)
+function randomBiasedInt (a, b, bias) {
+  return Math.floor(Math.pow(Math.random(), bias) * (b - (a + 1))) + a + 1
 }
 
 Logoot.prototype._generateLine = function (prev, next, value) {
@@ -91,9 +95,11 @@ Logoot.prototype._generateLine = function (prev, next, value) {
     const diff = nextId.int - prevId.int
 
     if (diff > 1) { // enough room for integer between prevInt and nextInt
-      newPosition.push(new Identifier(randomInt(prevId.int, nextId.int), self.site))
+      newPosition.push(new Identifier(randomBiasedInt(prevId.int, nextId.int, self._bias), self.site))
+      break
     } else if (diff === 1 && self.site > prevId.site) { // same, but site offers more room
       newPosition.push(new Identifier(prevId.int, self.site))
+      break
     } else { // no room, need to add a new id
       newPosition.push(prevId)
     }
@@ -139,8 +145,12 @@ Logoot.prototype._delete = function (index) {
 // construct a string from the sequence
 Logoot.prototype.value = function () {
   var self = this
-
   return self._lines.map(line => line.value).join('')
+}
+
+Logoot.prototype.length = function () {
+  var self = this
+  return self._lines.length - 2
 }
 
 Logoot.prototype.replaceRange = function (value, start, length) {

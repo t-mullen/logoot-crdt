@@ -1,7 +1,7 @@
 # logoot-crdt
 Replicate text or sequences over networks.
 
-Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt), at the cost of increased network guarantees (in-order delivery and exactly-once delivery).
+Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt), at the cost of needing increased network guarantees (in-order delivery and exactly-once delivery).
 
 Uses the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
@@ -38,11 +38,12 @@ npm install --save logoot-crdt
 ```
 
 ## api
-### `var doc = new Logoot(site, [state])`
+### `var doc = new Logoot(site, [state], [bias])`
 Create a new synchronized sequence.
 
 - `site` is a globally unique identifer.
 - `state` allows you to initialize from an existing sequence state. 
+- `bias` is the bias for the probability distribution used to allocate identifiers. It defaults to `15`, which is a good value for most left-to-right editing usecases. If your sequence is randomly edited, use `1`.
 
 ### `doc.insert(value, index)`
 Insert a new string.
