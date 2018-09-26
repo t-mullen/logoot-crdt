@@ -294,6 +294,24 @@ test('test random edit performance', function (t) {
   t.end()
 })
 
+test('test right-to-left edit performance', function (t) {
+  var w1 = new Logoot('site1', null)
+
+  var IDCount = 0
+  var totalIDLength = 0
+  w1.on('operation', (op) => {
+    IDCount++
+    totalIDLength += op.line.pos.ids.length
+  })
+
+  for (var i=0; i < 1000; i++) {
+    w1.insert('a', 0)
+  }
+
+  console.log('Average identifier length:', totalIDLength / IDCount) // should be high, worst-case for bias strategy
+  t.end()
+})
+
 test('test mixed edit performance', function (t) {
   var w1 = new Logoot('site1')
 
