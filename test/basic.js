@@ -46,6 +46,33 @@ function makeNodesWithDelay (n) {
   return nodes
 }
 
+function makeNodesWithHoldingQueue (n) {
+  var nodes = []
+
+  for (var i=0; i<n; i++) {
+    let w1 = new Logoot('site' + i)
+    w1.queues = {}
+
+    w1.receiveAllFrom = function (node) {
+      (w1.queues[node.site] || []).forEach(op => {
+        w1.receive(op)
+      })
+    }
+
+    nodes.push(w1)
+    w1.on('operation', function (op) { 
+      nodes.forEach(w2 => {
+        if (w2.site !== w1.site) {
+          w1.queues[w2.site] = w1.queues[w2.site] || []
+          w1.queues[w2.site].push(op)
+        }
+      })
+    })
+  }
+  
+  return nodes
+}
+
 test('single inserter', function (t) {
   var nodes = makeNodes(1)
 
@@ -128,6 +155,26 @@ test('test setValue', function (t) {
   t.equals(w1.value(), 'abc')
   
   t.end()
+})
+
+test('test delete before insert arrival', function (t) {
+  var nodes = makeNodesWithHoldingQueue(3)
+
+  nodes[0].insert('a', 0) // 0 inserts "a"
+  nodes[1].receiveAllFrom(nodes[0]) // 0 and 1 sync
+  nodes[1].delete(0, 1) // 1 deletes "a"
+  nodes[2].receiveAllFrom(nodes[1]) // 2 receives delete before insert
+  
+  // nodes fully sync
+  nodes.forEach(n1 => {
+    nodes.forEach(n2 => {
+      n1.receiveAllFrom(n2)
+    })
+  })
+
+  t.equals(nodes[0].value(), nodes[1].value())
+  t.equals(nodes[1].value(), nodes[2].value())
+  t.equals(nodes[0].value(), '')
 })
 
 function getRandomMethod () {

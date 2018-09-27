@@ -28,7 +28,6 @@ function Logoot (site, state, bias) {
 function parseLine (line) {
   return new Line(
     new Position(line.pos.ids.map(id => new Identifier(id.int, id.site))),
-    line.clock,
     line.value
   )
 }
