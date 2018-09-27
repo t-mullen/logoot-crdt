@@ -1,6 +1,5 @@
-function Line (pos, clock, value) {
+function Line (pos, value) {
   this.pos = pos
-  this.clock = clock
   this.value = value
 }
 module.exports = Line

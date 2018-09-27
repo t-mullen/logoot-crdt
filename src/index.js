@@ -16,7 +16,6 @@ function Logoot (site, state, bias) {
   EventEmitter.call(self)
 
   self.site = site
-  self._clock = 0
   self._bias = bias || 15
   self._lines = [
     new Line(new Position([new Identifier(MIN, null)]), null, null),
@@ -105,7 +104,7 @@ Logoot.prototype._generateLine = function (prev, next, value) {
     }
   }
 
-  return new Line(new Position(newPosition), ++self._clock, value)
+  return new Line(new Position(newPosition), value)
 }
 
 Logoot.prototype._findLineIndex = function (line) {
