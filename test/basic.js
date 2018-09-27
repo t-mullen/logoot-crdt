@@ -54,9 +54,10 @@ function makeNodesWithHoldingQueue (n) {
     w1.queues = {}
 
     w1.receiveAllFrom = function (node) {
-      (w1.queues[node.site] || []).forEach(op => {
+      (node.queues[w1.site] || []).forEach(op => {
         w1.receive(op)
       })
+      node.queues[w1.site] = []
     }
 
     nodes.push(w1)
@@ -175,6 +176,7 @@ test('test delete before insert arrival', function (t) {
   t.equals(nodes[0].value(), nodes[1].value())
   t.equals(nodes[1].value(), nodes[2].value())
   t.equals(nodes[0].value(), '')
+  t.end()
 })
 
 function getRandomMethod () {

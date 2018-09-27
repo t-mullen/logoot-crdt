@@ -21,6 +21,7 @@ function Logoot (site, state, bias) {
     new Line(new Position([new Identifier(MIN, null)]), null, null),
     new Line(new Position([new Identifier(MAX, null)]), null, null)
   ]
+  self._deleteQueue = []
 
   if (state) self.setState(state)
 }
@@ -41,10 +42,19 @@ Logoot.prototype.receive = function (operation) {
     const index = self._findLineIndex(operation.line)
     if (self._lines[index].pos.compare(operation.line.pos)) {
       self._lines.splice(index, 0, operation.line)
+
+      // clear delete queue
+      self._deleteQueue.forEach((op, index) => {
+        self._deleteQueue.splice(index, 1)
+        self.receive(op)
+      })
     }
   } else {
     const index = self._findLineIndex(operation.line)
-    if (self._lines[index].value == null) return // can't delete end positions
+    if (self._lines[index].value == null) { // couldn't find line to delete, await integration
+      self._deleteQueue.push(operation)
+      return
+    }
     self._lines.splice(index, 1)
   }
 }
@@ -168,7 +178,8 @@ Logoot.prototype.getState = function () {
   const self = this
 
   return JSON.stringify({
-    lines: self._lines
+    lines: self._lines,
+    deleteQueue: self._deleteQueue
   })
 }
 
@@ -178,6 +189,9 @@ Logoot.prototype.setState = function (state) {
   const parsed = JSON.parse(state)
 
   self._lines = parsed.lines.map(parseLine)
+  self._deleteQueue = parsed.deleteQueue.map(op => {
+    return { type: op.type, line: parseLine(op.line) }
+  })
 }
 
 module.exports = Logoot
