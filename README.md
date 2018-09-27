@@ -1,7 +1,7 @@
 # logoot-crdt
 Replicate text or sequences over networks.
 
-Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt), at the cost of needing increased network guarantees (in-order delivery and exactly-once delivery).
+Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt). 
 
 Uses the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
@@ -12,7 +12,7 @@ var l2 = new Logoot('site1')
 
 // send sync messages between peers
 l1.on('operation', (op) => {
-  // send through your network (in-order, exactly-once delivery is required)
+  // send through your network (just need at-least-once, in-order delivery)
   l2.receive(op)
 })
 l2.on('operation', (op) => {

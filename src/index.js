@@ -40,10 +40,10 @@ Logoot.prototype.receive = function (operation) {
 
   if (operation.type === 'insert') {
     const index = self._findLineIndex(operation.line)
-    if (self._lines[index].pos.compare(operation.line.pos)) {
+    if (self._lines[index].pos.compare(operation.line.pos) !== 0) {
       self._lines.splice(index, 0, operation.line)
 
-      // clear delete queue
+        // clear delete queue
       self._deleteQueue.forEach((op, index) => {
         self._deleteQueue.splice(index, 1)
         self.receive(op)
@@ -51,10 +51,11 @@ Logoot.prototype.receive = function (operation) {
     }
   } else {
     const index = self._findLineIndex(operation.line)
-    if (self._lines[index].value == null) { // couldn't find line to delete, await integration
+    if (self._lines[index].pos.compare(operation.line.pos) !== 0) { // couldn't find line to delete, await integration
       self._deleteQueue.push(operation)
       return
     }
+    if (self._lines[index].value == null) return // can't delete end nodes
     self._lines.splice(index, 1)
   }
 }

@@ -379,3 +379,28 @@ test('test mixed edit performance', function (t) {
   console.log('Average identifier length:', totalIDLength / IDCount)
   t.end()
 })
+
+test('more-than-once delivery', function (t) {
+  var w1 = new Logoot('site1')
+  var w2 = new Logoot('site2')
+
+  w1.on('operation', (op) => {
+    for (var i=0; i<10; i++) {
+      w2.receive(op)
+    }
+  })
+  w2.on('operation', (op) => {
+    for (var i=0; i<10; i++) {
+      w1.receive(op)
+    }
+  })
+  
+  w1.insert('abc', 0)
+  w2.delete(0, 2)
+  w1.insert('123', 1)
+  w2.replaceRange('m', 0, 2)
+
+  t.equals(w1.value(), w2.value())
+  t.equals(w1.value(), 'm23')
+  t.end()
+})
