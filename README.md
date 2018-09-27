@@ -5,6 +5,11 @@ Allows an unlimited number of authors to collborate on text over networks. Has m
 
 Uses the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
+Also adds some improvements:
+- A readiness check for deletions to allow more-than-once delivery without version vectors.
+- A hybrid of the random and boundary allocation strategys that should work for most editing behaviours.
+- Support for a 2-step initial state transfer.
+
 ## example
 ```javascript
 var l1 = new Logoot('site1')
