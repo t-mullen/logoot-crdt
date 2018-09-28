@@ -1,4 +1,5 @@
 var test = require('tape')
+var sizeof = require('object-sizeof');
 
 var Logoot = require('./../src/index')
 
@@ -101,6 +102,21 @@ test('test insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), 'x123myzabcf')
+  
+  t.end()
+})
+
+test('test split insert', function (t) {
+  var nodes = makeNodes(2)
+
+  var w1 = nodes[0] 
+  var w2 = nodes[1] 
+  
+  w1.insert('ab', 0)
+  w2.insert('xyz', 1)
+  
+  t.equals(w1.value(), w2.value())
+  t.equals(w1.value(), 'axyzb')
   
   t.end()
 })
@@ -322,6 +338,8 @@ test('test left-to-right edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
+  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
 
@@ -340,6 +358,8 @@ test('test random edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
+  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
 
@@ -358,6 +378,8 @@ test('test right-to-left edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount) // should be high, worst-case for bias strategy
+  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
 
@@ -377,6 +399,8 @@ test('test mixed edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
+  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
 

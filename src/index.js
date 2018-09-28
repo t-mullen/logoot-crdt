@@ -16,10 +16,11 @@ function Logoot (site, state, bias) {
   EventEmitter.call(self)
 
   self.site = site
+  self._clock = 0
   self._bias = bias || 15
   self._lines = [
-    new Line(new Position([new Identifier(MIN, null)]), null, null),
-    new Line(new Position([new Identifier(MAX, null)]), null, null)
+    new Line(new Position([new Identifier(MIN, null)]), null),
+    new Line(new Position([new Identifier(MAX, null)]), null)
   ]
   self._deleteQueue = []
 
@@ -27,8 +28,9 @@ function Logoot (site, state, bias) {
 }
 
 function parseLine (line) {
+  const pos = line.pos
   return new Line(
-    new Position(line.pos.ids.map(id => new Identifier(id.int, id.site))),
+    new Position(pos.ids.map(id => new Identifier(id.int, id.site)), pos.site, pos.clock),
     line.value
   )
 }
@@ -114,7 +116,7 @@ Logoot.prototype._generateLine = function (prev, next, value) {
     }
   }
 
-  return new Line(new Position(newPosition), value)
+  return new Line(new Position(newPosition, self.site, self._clock++), value)
 }
 
 Logoot.prototype._findLineIndex = function (line) {

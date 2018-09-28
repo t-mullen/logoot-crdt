@@ -1,5 +1,7 @@
-function Position (ids) {
+function Position (ids, site, clock) {
   this.ids = ids
+  this.site = site
+  this.clock = clock
 }
 
 Position.prototype.compare = function (other) {
@@ -17,12 +19,25 @@ Position.prototype.compare = function (other) {
         return -1 // rightmost checked value is lesser
     }
   }
+
   if (self.ids.length > minLength) {
     return 1
   } else if (other.ids.length > minLength) {
-    return -1 // other has extended length
+    return -1
   } else {
-    return 0 // all equal
+    if (self.site > other.site) {
+      return 1
+    } else if (self.site < other.site) {
+      return -1
+    } else {
+      if (self.clock > other.clock) {
+        return 1
+      } else if (self.clock < other.clock) {
+        return -1
+      } else {
+        return 0
+      }
+    }
   }
 }
 
