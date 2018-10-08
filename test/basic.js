@@ -1,5 +1,5 @@
 const test = require('tape')
-const sizeof = require('object-sizeof');
+const sizeof = require('object-sizeof')
 
 const Logoot = require('./../src/index')
 const common = require('./common')
@@ -35,20 +35,53 @@ test('test insert', function (t) {
   t.end()
 })
 
+/*
 test('test split insert', function (t) {
-  var nodes = common.makeNodes(2)
+  var nodes = common.makeNodesWithHoldingQueue(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
   
-  w1.insert('ab', 0)
-  w2.insert('xyz', 1)
+  w1.insert('abc', 0)
+  w2.insert('xyz', 0)
+
+  w1.receiveAllFrom(w2)
+  w2.receiveAllFrom(w1)
   
   t.equals(w1.value(), w2.value())
-  t.equals(w1.value(), 'axyzb')
+  t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
+  w1._root.walk((node) => {
+    console.log(node.value, node.getPath().map(id=>id.int))
+  })
   
   t.end()
 })
+
+test('test reverse split insert', function (t) {
+  var nodes = common.makeNodesWithHoldingQueue(2)
+
+  var w1 = nodes[0] 
+  var w2 = nodes[1] 
+  
+  w1.insert('c', 0)
+  w1.insert('b', 0)
+  w1.insert('a', 0)
+  w2.insert('z', 0)
+  w2.insert('y', 0)
+  w2.insert('x', 0)
+
+  w1.receiveAllFrom(w2)
+  w2.receiveAllFrom(w1)
+  
+  t.equals(w1.value(), w2.value())
+  t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
+  w1._root.walk((node) => {
+    console.log(node.value, node.getPath().map(id=>id.int))
+  })
+  
+  t.end()
+})
+*/
 
 test('test delete', function (t) {
   var nodes = common.makeNodes(2)
@@ -235,6 +268,26 @@ test('test randomized operations with delay n=10', function (t) {
   }, 1000)
 })
 
+test('test random delayed repeats n=3', function (t) {
+  t.plan(1)
+
+  var nodes = common.makeNodesWithDelayedRepeats(3)
+  var rounds = 10
+
+  for (var i=0; i<rounds; i++) {
+    nodes.forEach(node => {
+      var method = getRandomMethod()
+      node[method].apply(node, getRandomArguments(method))
+    })
+  }
+
+  setTimeout(() => {
+    var finalValue = nodes[0].value()
+    t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.end()
+  }, 1000)
+})
+
 test('state transfer', function (t) {
   var nodes = common.makeNodes(2)
 
@@ -279,7 +332,7 @@ test('test left-to-right edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += sizeof(op)
+    totalIDLength += op.position.length
   })
   
   for (var i=0; i < 1000; i++) {
@@ -299,7 +352,7 @@ test('test random edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += sizeof(op)
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 1000; i++) {
@@ -319,7 +372,7 @@ test('test right-to-left edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += sizeof(op)
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 1000; i++) {
@@ -339,7 +392,7 @@ test('test mixed edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += sizeof(op)
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 500; i++) {

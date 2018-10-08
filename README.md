@@ -7,8 +7,10 @@ Uses the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
 Also adds some improvements:
 - A readiness check for deletions to allow more-than-once delivery without version vectors.
-- A hybrid of the random and boundary allocation strategys that should work for most editing behaviours.
+- LSEQ base doubling to reduce identifier integer size.
+- A hybrid of the LSEQ random and boundary allocation strategys that should work for most editing behaviours.
 - Support for a 2-step initial state transfer.
+- Implements everything as a tree for fast character lookups.
 
 ## example
 ```javascript

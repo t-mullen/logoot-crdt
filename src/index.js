@@ -8,11 +8,13 @@ inherits(Logoot, EventEmitter)
 
 const MIN = 0
 const MAX = Number.MAX_SAFE_INTEGER
+const BASE = 10
 
 function Logoot (site, state, bias) {
   EventEmitter.call(this)
 
   this.site = site
+  this.clock = 0
   this._deleteQueue = []
   this._bias = bias || 15
 
@@ -20,39 +22,52 @@ function Logoot (site, state, bias) {
 
   this._root = new Node()
   this._root.setEmpty(true)
-  this._root.addChild(new Node(new Identifier(MIN, null)))
-  this._root.addChild(new Node(new Identifier(MAX, null)))
+  this._root.addChild(new Node(new Identifier(MIN, null, null)))
+  this._root.addChild(new Node(new Identifier(BASE, null, null)))
 
   if (state) this.setState(state)
 }
 
 function parseId (id) {
-  if (id) return new Identifier(id.int, id.site)
+  if (id) return new Identifier(id.int, id.site, id.clock)
 }
 function parseOperation (operation) {
+  operation.parsed = true
   operation.position = operation.position.map(parseId)
   return operation
 }
+function arePositionsEqual (a, b) {
+  if (a.length !== b.length) return false
+  return !a.some((id, index) => {
+    return id.compare(b[index]) !== 0
+  })
+}
 
 Logoot.prototype.receive = function (operation) {
-  operation = parseOperation(operation)
+  if (!operation.parsed) operation = parseOperation(operation)
   if (operation.type === 'insert') {
+    const deleteQueueIndex = this._deleteQueue.findIndex(op => {
+      return arePositionsEqual(op.position, operation.position)
+    })
+    if (deleteQueueIndex > -1) {
+      this._deleteQueue.splice(deleteQueueIndex, 1)
+      return
+    }
+
     const node = this._root.getChildByPath(operation.position)
     node.value = operation.value
     node.setEmpty(false)
-
-    var currentQueue = this._deleteQueue
-    this._deleteQueue = []
-    currentQueue.forEach((op) => {
-      this.receive(op)
-    })
-  } else {
+  } else if (operation.type === 'delete') {
     const node = this._root.getChildByPath(operation.position, false)
     if (node) {
       node.setEmpty(true)
       node.trimEmpty()
     } else {
-      this._deleteQueue.push(operation)
+      if (!this._deleteQueue.some(op => {
+        return arePositionsEqual(op.position, operation.position)
+      })) {
+        this._deleteQueue.push(operation)
+      }
     }
   }
 }
@@ -69,37 +84,42 @@ Logoot.prototype._insert = function (value, index) {
   const prev = this._root.getChildByOrder(index)
   const next = this._root.getChildByOrder(index + 1)
 
-  if (!prev) {
-    console.log(value, index, this.length())
-  }
+  const prevPos = prev.getPath()
+  const nextPos = next.getPath()
 
-  const position = this._generatePositionBetween(prev, next, value)
+  const position = this._generatePositionBetween(prevPos, nextPos, value)
   this.emit('operation', { type: 'insert', position, value })
 }
 
 function randomBiasedInt (a, b, bias) {
   return Math.floor(Math.pow(Math.random(), bias) * (b - (a + 1))) + a + 1
 }
+function randomStrat (bias) {
+  return Math.random() > 0.5 ? bias : 1 / bias
+}
+function doubledBase (depth) {
+  return Math.min(BASE * Math.pow(2, depth), MAX)
+}
 
-Logoot.prototype._generatePositionBetween = function (prev, next, value) {
-  const prevPos = prev.getPath()
-  const nextPos = next.getPath()
+Logoot.prototype._generatePositionBetween = function (prevPos, nextPos, value) {
   const newPos = []
 
   const maxLength = Math.max(prevPos.length, nextPos.length)
 
   for (var depth = 0; depth < maxLength + 1; depth++) {
-    const prevId = prevPos[depth] || new Identifier(MIN, null)
-    const nextId = nextPos[depth] || new Identifier(MAX, null)
+    const DEPTH_MAX = doubledBase(depth)
+    const prevId = prevPos[depth] || new Identifier(MIN, null, null)
+    const nextId = nextPos[depth] || new Identifier(DEPTH_MAX, null, null) // base doubling
 
     const diff = nextId.int - prevId.int
 
     if (diff > 1) { // enough room for integer between prevInt and nextInt
-      const id = new Identifier(randomBiasedInt(prevId.int, nextId.int, this._bias), this.site)
+      const offset = randomBiasedInt(prevId.int, nextId.int, randomStrat(this._bias))
+      const id = new Identifier(offset, this.site, this.clock++)
       newPos.push(id)
       break
     } else if (diff === 1 && this.site > prevId.site) { // same, but site offers more room
-      const id = new Identifier(prevId.int, this.site)
+      const id = new Identifier(prevId.int, this.site, this.clock++)
       newPos.push(id)
       break
     } else { // no room, need to search/build next level
