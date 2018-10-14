@@ -8,7 +8,7 @@ inherits(Logoot, EventEmitter)
 
 const MIN = 0
 const MAX = Number.MAX_SAFE_INTEGER
-const BASE = 10
+const BASE = Math.pow(2, 8)
 
 function Logoot (site, state, bias) {
   EventEmitter.call(this)
@@ -78,6 +78,18 @@ Logoot.prototype.insert = function (value, index) {
   })
 }
 
+function isAtEndOfBlock (node) {
+  const index = node.parent._exactSearch(node)
+  const rightSibling = node.parent.children[index + 1]
+  return !rightSibling || rightSibling.id.site !== node.id.site
+}
+
+function isAtStartOfBlock (node) {
+  const index = node.parent._exactSearch(node)
+  const leftSibling = node.parent.children[index - 1]
+  return !leftSibling || leftSibling.id.site !== node.id.site
+}
+
 Logoot.prototype._insert = function (value, index) {
   index = Math.min(index, this.length())
 
@@ -87,7 +99,21 @@ Logoot.prototype._insert = function (value, index) {
   const prevPos = prev.getPath()
   const nextPos = next.getPath()
 
-  const position = this._generatePositionBetween(prevPos, nextPos, value)
+  var position
+  if (prev.id.site === this.site && prev.id.int + 1 < doubledBase(prevPos.length - 1) && isAtEndOfBlock(prev)) {
+    position = prevPos.slice(0, -1)
+    position.push(new Identifier(prev.id.int + 1, this.site, this.clock++))
+  } else if (next.id.site === this.site && next.id.int - 1 > MIN && isAtStartOfBlock(next)) {
+    position = nextPos.slice(0, -1)
+    position.push(new Identifier(next.id.int - 1, this.site, this.clock++))
+  } else {
+    position = this._generatePositionBetween(prevPos, nextPos, value)
+  }
+
+  const node = this._root.getChildByPath(position)
+  node.value = value
+  node.setEmpty(false)
+
   this.emit('operation', { type: 'insert', position, value })
 }
 
@@ -114,11 +140,11 @@ Logoot.prototype._generatePositionBetween = function (prevPos, nextPos, value) {
     const diff = nextId.int - prevId.int
 
     if (diff > 1) { // enough room for integer between prevInt and nextInt
-      const offset = randomBiasedInt(prevId.int, nextId.int, randomStrat(this._bias))
-      const id = new Identifier(offset, this.site, this.clock++)
+      const int = randomBiasedInt(prevId.int, nextId.int, randomStrat(this._bias))
+      const id = new Identifier(int, this.site, this.clock++)
       newPos.push(id)
       break
-    } else if (diff === 1 && this.site > prevId.site) { // same, but site offers more room
+    } else if (this.site > prevId.site) { // same, but site offers more room
       const id = new Identifier(prevId.int, this.site, this.clock++)
       newPos.push(id)
       break
@@ -127,9 +153,9 @@ Logoot.prototype._generatePositionBetween = function (prevPos, nextPos, value) {
     }
   }
 
-  const node = this._root.getChildByPath(newPos)
-  node.value = value
-  node.setEmpty(false)
+  // push offset
+  const DEPTH_MAX = doubledBase(depth)
+  newPos.push(new Identifier(Math.floor((DEPTH_MAX + MIN) / 2), this.site, this.clock++))
 
   return newPos
 }

@@ -35,7 +35,6 @@ test('test insert', function (t) {
   t.end()
 })
 
-/*
 test('test split insert', function (t) {
   var nodes = common.makeNodesWithHoldingQueue(2)
 
@@ -50,9 +49,6 @@ test('test split insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
-  w1._root.walk((node) => {
-    console.log(node.value, node.getPath().map(id=>id.int))
-  })
   
   t.end()
 })
@@ -75,13 +71,9 @@ test('test reverse split insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
-  w1._root.walk((node) => {
-    console.log(node.value, node.getPath().map(id=>id.int))
-  })
   
   t.end()
 })
-*/
 
 test('test delete', function (t) {
   var nodes = common.makeNodes(2)
