@@ -113,6 +113,19 @@ Node.prototype.getChildByPath = function (path, build = true) {
   return current
 }
 
+Node.prototype.getOrder = function () {
+  if (!this.parent) return -1 // -1 to discount the left end node
+  var order = this.parent.getOrder()
+  if (!this.parent.empty) order += 1
+
+  for (var i = 0; i < this.parent.children.length; i++) {
+    if (Node.compare(this.parent.children[i].id, this.id) === 0) break
+    order += this.parent.children[i].size
+  }
+
+  return order
+}
+
 Node.prototype.getChildByOrder = function (index) {
   if (index === 0 && !this.empty) return this
 

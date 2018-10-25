@@ -1,4 +1,4 @@
-# logoot-crdt
+# logoot-crdt (WIP)
 Replicate text or sequences over networks.
 
 Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt). 
