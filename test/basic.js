@@ -1,82 +1,11 @@
-var test = require('tape')
-var sizeof = require('object-sizeof');
+const test = require('tape')
+const sizeof = require('object-sizeof')
 
-var Logoot = require('./../src/index')
-
-function makeNodes (n) {
-  var nodes = []
-
-  for (var i=0; i<n; i++) {
-    let w1 = new Logoot('site' + i)
-    nodes.push(w1)
-    w1.on('operation', function (op) { 
-      nodes.forEach(w2 => {
-        if (w2.site !== w1.site) {
-            w2.receive(JSON.parse(JSON.stringify(op)))
-        }
-      })
-    })
-  }
-  
-  return nodes
-}
-
-function makeNodesWithDelay (n) {
-  var nodes = []
-
-  for (var i=0; i<n; i++) {
-    let w1 = new Logoot('site' + i)
-    w1.queues = {}
-
-
-    nodes.push(w1)
-    w1.on('operation', function (op) { 
-      nodes.forEach(w2 => {
-        if (w2.site !== w1.site) {
-          w1.queues[w2.site] = w1.queues[w2.site] || []
-          w1.queues[w2.site].push(op)
-
-          setTimeout(() => {
-            w2.receive(w1.queues[w2.site].shift())
-          }, Math.random() * 100)
-        }
-      })
-    })
-  }
-  
-  return nodes
-}
-
-function makeNodesWithHoldingQueue (n) {
-  var nodes = []
-
-  for (var i=0; i<n; i++) {
-    let w1 = new Logoot('site' + i)
-    w1.queues = {}
-
-    w1.receiveAllFrom = function (node) {
-      (node.queues[w1.site] || []).forEach(op => {
-        w1.receive(op)
-      })
-      node.queues[w1.site] = []
-    }
-
-    nodes.push(w1)
-    w1.on('operation', function (op) { 
-      nodes.forEach(w2 => {
-        if (w2.site !== w1.site) {
-          w1.queues[w2.site] = w1.queues[w2.site] || []
-          w1.queues[w2.site].push(op)
-        }
-      })
-    })
-  }
-  
-  return nodes
-}
+const Logoot = require('./../src/index')
+const common = require('./common')
 
 test('single inserter', function (t) {
-  var nodes = makeNodes(1)
+  var nodes = common.makeNodes(1)
 
   var w1 = nodes[0] 
   
@@ -89,7 +18,7 @@ test('single inserter', function (t) {
 })
 
 test('test insert', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
@@ -107,29 +36,54 @@ test('test insert', function (t) {
 })
 
 test('test split insert', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodesWithHoldingQueue(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
   
-  w1.insert('ab', 0)
-  w2.insert('xyz', 1)
+  w1.insert('abc', 0)
+  w2.insert('xyz', 0)
+
+  w1.receiveAllFrom(w2)
+  w2.receiveAllFrom(w1)
   
   t.equals(w1.value(), w2.value())
-  t.equals(w1.value(), 'axyzb')
+  t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
+  
+  t.end()
+})
+
+test('test reverse split insert', function (t) {
+  var nodes = common.makeNodesWithHoldingQueue(2)
+
+  var w1 = nodes[0] 
+  var w2 = nodes[1] 
+  
+  w1.insert('c', 0)
+  w1.insert('b', 0)
+  w1.insert('a', 0)
+  w2.insert('z', 0)
+  w2.insert('y', 0)
+  w2.insert('x', 0)
+
+  w1.receiveAllFrom(w2)
+  w2.receiveAllFrom(w1)
+  
+  t.equals(w1.value(), w2.value())
+  t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
   
   t.end()
 })
 
 test('test delete', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
   
   w1.insert('abcdefg', 0)
   w2.delete(2)
-  w1.delete(1, 3)
+  w1.delete(0, 3)
   w1.delete(0)
   w1.delete(2)
   w2.delete(w2.value().length - 1)
@@ -141,7 +95,7 @@ test('test delete', function (t) {
 })
 
 test('test replaceRange', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
@@ -160,7 +114,7 @@ test('test replaceRange', function (t) {
 })
 
 test('test setValue', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
@@ -175,7 +129,7 @@ test('test setValue', function (t) {
 })
 
 test('test delete before insert arrival', function (t) {
-  var nodes = makeNodesWithHoldingQueue(3)
+  var nodes = common.makeNodesWithHoldingQueue(3)
 
   nodes[0].insert('a', 0) // 0 inserts "a"
   nodes[1].receiveAllFrom(nodes[0]) // 0 and 1 sync
@@ -215,7 +169,7 @@ function getRandomArguments (method) {
 }
 
 test('test randomized operations n=2', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
   var rounds = 50
 
   for (var i=0; i<rounds; i++) {
@@ -233,7 +187,7 @@ test('test randomized operations n=2', function (t) {
 test('test randomized operations with delay n=2', function (t) {
   t.plan(1)
 
-  var nodes = makeNodesWithDelay(2)
+  var nodes = common.makeNodesWithDelay(2)
   var rounds = 50
 
   for (var i=0; i<rounds; i++) {
@@ -251,7 +205,7 @@ test('test randomized operations with delay n=2', function (t) {
 })
 
 test('test randomized operations n=10', function (t) {
-  var nodes = makeNodes(10)
+  var nodes = common.makeNodes(10)
   var rounds = 5
 
   for (var i=0; i<rounds; i++) {
@@ -266,10 +220,30 @@ test('test randomized operations n=10', function (t) {
   t.end()
 })
 
+test('test randomized operations with delay n=3', function (t) {
+  t.plan(1)
+
+  var nodes = common.makeNodesWithDelay(3)
+  var rounds = 1000
+
+  for (var i=0; i<rounds; i++) {
+    nodes.forEach(node => {
+      var method = getRandomMethod()
+      node[method].apply(node, getRandomArguments(method))
+    })
+  }
+
+  setTimeout(() => {
+    var finalValue = nodes[0].value()
+    t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.end()
+  }, 1000)
+})
+
 test('test randomized operations with delay n=10', function (t) {
   t.plan(1)
 
-  var nodes = makeNodesWithDelay(10)
+  var nodes = common.makeNodesWithDelay(10)
   var rounds = 5
 
   for (var i=0; i<rounds; i++) {
@@ -286,8 +260,28 @@ test('test randomized operations with delay n=10', function (t) {
   }, 1000)
 })
 
+test('test random delayed repeats n=3', function (t) {
+  t.plan(1)
+
+  var nodes = common.makeNodesWithDelayedRepeats(3)
+  var rounds = 10
+
+  for (var i=0; i<rounds; i++) {
+    nodes.forEach(node => {
+      var method = getRandomMethod()
+      node[method].apply(node, getRandomArguments(method))
+    })
+  }
+
+  setTimeout(() => {
+    var finalValue = nodes[0].value()
+    t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.end()
+  }, 1000)
+})
+
 test('state transfer', function (t) {
-  var nodes = makeNodes(2)
+  var nodes = common.makeNodes(2)
 
   var w1 = nodes[0] 
   var w2 = nodes[1] 
@@ -330,15 +324,15 @@ test('test left-to-right edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += op.line.pos.ids.length
+    totalIDLength += op.position.length
   })
   
-  for (var i=0; i < 10000; i++) {
+  for (var i=0; i < 1000; i++) {
     w1.insert('a', i)
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
-  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('Document size:', JSON.parse(sizeof(w1.getState())) / 10**6, 'mB')
   console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
@@ -350,7 +344,7 @@ test('test random edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += op.line.pos.ids.length
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 1000; i++) {
@@ -358,7 +352,7 @@ test('test random edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
-  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('Document size:', JSON.parse(sizeof(w1.getState())) / 10**6, 'mB')
   console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
@@ -370,7 +364,7 @@ test('test right-to-left edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += op.line.pos.ids.length
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 1000; i++) {
@@ -378,7 +372,7 @@ test('test right-to-left edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount) // should be high, worst-case for bias strategy
-  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('Document size:', JSON.parse(sizeof(w1.getState())) / 10**6, 'mB')
   console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })
@@ -390,7 +384,7 @@ test('test mixed edit performance', function (t) {
   var totalIDLength = 0
   w1.on('operation', (op) => {
     IDCount++
-    totalIDLength += op.line.pos.ids.length
+    totalIDLength += op.position.length
   })
 
   for (var i=0; i < 500; i++) {
@@ -399,7 +393,7 @@ test('test mixed edit performance', function (t) {
   }
 
   console.log('Average identifier length:', totalIDLength / IDCount)
-  console.log('Document size:', sizeof(w1) / 10**6, 'mB')
+  console.log('Document size:', JSON.parse(sizeof(w1.getState())) / 10**6, 'mB')
   console.log('True document size:', sizeof(w1.value()) / 10**6, 'mB')
   t.end()
 })

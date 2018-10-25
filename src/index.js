@@ -1,202 +1,224 @@
 const EventEmitter = require('nanobus')
 const inherits = require('inherits')
 
-const Line = require('./line')
-const Position = require('./position')
+const Node = require('./node')
 const Identifier = require('./identifier')
 
 inherits(Logoot, EventEmitter)
 
-const MIN = -Number.MAX_SAFE_INTEGER
+const MIN = 0
 const MAX = Number.MAX_SAFE_INTEGER
+const BASE = Math.pow(2, 8)
 
 function Logoot (site, state, bias) {
-  var self = this
+  EventEmitter.call(this)
 
-  EventEmitter.call(self)
+  this.site = site
+  this.clock = 0
+  this._deleteQueue = []
+  this._bias = bias || 15
 
-  self.site = site
-  self._clock = 0
-  self._bias = bias || 15
-  self._lines = [
-    new Line(new Position([new Identifier(MIN, null)]), null),
-    new Line(new Position([new Identifier(MAX, null)]), null)
-  ]
-  self._deleteQueue = []
+  Node.compare = (a, b) => { return a.compare(b) }
 
-  if (state) self.setState(state)
+  this._root = new Node()
+  this._root.setEmpty(true)
+  this._root.addChild(new Node(new Identifier(MIN, null, null)))
+  this._root.addChild(new Node(new Identifier(BASE, null, null)))
+
+  if (state) this.setState(state)
 }
 
-function parseLine (line) {
-  const pos = line.pos
-  return new Line(
-    new Position(pos.ids.map(id => new Identifier(id.int, id.site)), pos.site, pos.clock),
-    line.value
-  )
+function parseId (id) {
+  if (id) return new Identifier(id.int, id.site, id.clock)
+}
+function parseOperation (operation) {
+  operation.parsed = true
+  operation.position = operation.position.map(parseId)
+  return operation
+}
+function arePositionsEqual (a, b) {
+  if (a.length !== b.length) return false
+  return !a.some((id, index) => {
+    return id.compare(b[index]) !== 0
+  })
 }
 
 Logoot.prototype.receive = function (operation) {
-  var self = this
-
-  operation.line = parseLine(operation.line)
-
+  if (!operation.parsed) operation = parseOperation(operation)
   if (operation.type === 'insert') {
-    const index = self._findLineIndex(operation.line)
-    if (self._lines[index].pos.compare(operation.line.pos) !== 0) {
-      self._lines.splice(index, 0, operation.line)
-      self.emit('insert', { index, value: operation.line.value })
-
-        // clear delete queue
-      self._deleteQueue.forEach((op, index) => {
-        self._deleteQueue.splice(index, 1)
-        self.receive(op)
-      })
-    }
-  } else {
-    const index = self._findLineIndex(operation.line)
-    if (self._lines[index].pos.compare(operation.line.pos) !== 0) { // couldn't find line to delete, await integration
-      self._deleteQueue.push(operation)
+    const deleteQueueIndex = this._deleteQueue.findIndex(op => {
+      return arePositionsEqual(op.position, operation.position)
+    })
+    if (deleteQueueIndex > -1) {
+      this._deleteQueue.splice(deleteQueueIndex, 1)
       return
     }
-    if (self._lines[index].value == null) return // can't delete end nodes
-    var value = self._lines.splice(index, 1)[0].value
-    self.emit('delete', { index, value })
+
+    const node = this._root.getChildByPath(operation.position)
+    node.value = operation.value
+    node.setEmpty(false)
+  } else if (operation.type === 'delete') {
+    const node = this._root.getChildByPath(operation.position, false)
+    if (node) {
+      node.setEmpty(true)
+      node.trimEmpty()
+    } else {
+      if (!this._deleteQueue.some(op => {
+        return arePositionsEqual(op.position, operation.position)
+      })) {
+        this._deleteQueue.push(operation)
+      }
+    }
   }
 }
 
 Logoot.prototype.insert = function (value, index) {
-  var self = this
   value.split('').forEach((character, i) => {
-    self._insert(character, index + i)
+    this._insert(character, index + i)
   })
 }
 
-Logoot.prototype._insert = function (value, index) {
-  var self = this
-
-  const prev = self._lines[index]
-  const next = self._lines[index + 1]
-
-  if (!prev || !next) return
-
-  const line = self._generateLine(prev, next, value)
-  self._lines.splice(index + 1, 0, line)
-
-  self.emit('operation', { type: 'insert', line })
+function isAtEndOfBlock (node) {
+  const index = node.parent._exactSearch(node)
+  const rightSibling = node.parent.children[index + 1]
+  return !rightSibling || rightSibling.id.site !== node.id.site
 }
 
-// get random integer in (exclusive) range [a, b] with a linear bias
-// Closer to 0 will provide better perfromance when edits are at start of document
-// 1 is random allocation strategy
-// Above 1 will provide better performance when edits are subsequent (usually the case)
+function isAtStartOfBlock (node) {
+  const index = node.parent._exactSearch(node)
+  const leftSibling = node.parent.children[index - 1]
+  return !leftSibling || leftSibling.id.site !== node.id.site
+}
+
+Logoot.prototype._insert = function (value, index) {
+  index = Math.min(index, this.length())
+
+  const prev = this._root.getChildByOrder(index)
+  const next = this._root.getChildByOrder(index + 1)
+
+  const prevPos = prev.getPath()
+  const nextPos = next.getPath()
+
+  var position
+  if (prev.id.site === this.site && prev.id.int + 1 < doubledBase(prevPos.length - 1) && isAtEndOfBlock(prev)) {
+    position = prevPos.slice(0, -1)
+    position.push(new Identifier(prev.id.int + 1, this.site, this.clock++))
+  } else if (next.id.site === this.site && next.id.int - 1 > MIN && isAtStartOfBlock(next)) {
+    position = nextPos.slice(0, -1)
+    position.push(new Identifier(next.id.int - 1, this.site, this.clock++))
+  } else {
+    position = this._generatePositionBetween(prevPos, nextPos, value)
+  }
+
+  const node = this._root.getChildByPath(position)
+  node.value = value
+  node.setEmpty(false)
+
+  this.emit('operation', { type: 'insert', position, value })
+}
+
 function randomBiasedInt (a, b, bias) {
   return Math.floor(Math.pow(Math.random(), bias) * (b - (a + 1))) + a + 1
 }
+function randomStrat (bias) {
+  return Math.random() > 0.5 ? bias : 1 / bias
+}
+function doubledBase (depth) {
+  return Math.min(BASE * Math.pow(2, depth), MAX)
+}
 
-Logoot.prototype._generateLine = function (prev, next, value) {
-  const self = this
+Logoot.prototype._generatePositionBetween = function (prevPos, nextPos, value) {
+  const newPos = []
 
-  // first, find the common prefix of both position identifiers
-  var newPosition = []
+  const maxLength = Math.max(prevPos.length, nextPos.length)
 
-  var maxLength = Math.max(prev.pos.ids.length, next.pos.ids.length)
-
-  for (var index = 0; index < maxLength + 1; index++) {
-    const prevId = prev.pos.ids[index] || new Identifier(MIN, null)
-    const nextId = next.pos.ids[index] || new Identifier(MAX, null)
+  for (var depth = 0; depth < maxLength + 1; depth++) {
+    const DEPTH_MAX = doubledBase(depth)
+    const prevId = prevPos[depth] || new Identifier(MIN, null, null)
+    const nextId = nextPos[depth] || new Identifier(DEPTH_MAX, null, null) // base doubling
 
     const diff = nextId.int - prevId.int
 
     if (diff > 1) { // enough room for integer between prevInt and nextInt
-      newPosition.push(new Identifier(randomBiasedInt(prevId.int, nextId.int, self._bias), self.site))
+      const int = randomBiasedInt(prevId.int, nextId.int, randomStrat(this._bias))
+      const id = new Identifier(int, this.site, this.clock++)
+      newPos.push(id)
       break
-    } else if (diff === 1 && self.site > prevId.site) { // same, but site offers more room
-      newPosition.push(new Identifier(prevId.int, self.site))
+    } else if (this.site > prevId.site) { // same, but site offers more room
+      const id = new Identifier(prevId.int, this.site, this.clock++)
+      newPos.push(id)
       break
-    } else { // no room, need to add a new id
-      newPosition.push(prevId)
+    } else { // no room, need to search/build next level
+      newPos.push(prevId)
     }
   }
 
-  return new Line(new Position(newPosition, self.site, self._clock++), value)
-}
+  // push offset
+  const DEPTH_MAX = doubledBase(depth)
+  newPos.push(new Identifier(Math.floor((DEPTH_MAX + MIN) / 2), this.site, this.clock++))
 
-Logoot.prototype._findLineIndex = function (line) {
-  const self = this
-
-  var L = 0
-  var R = self._lines.length
-
-  while (L < R) {
-    var M = Math.floor((L + R) / 2)
-    if (self._lines[M].pos.compare(line.pos) === -1) {
-      L = M + 1
-    } else {
-      R = M
-    }
-  }
-  return L
+  return newPos
 }
 
 Logoot.prototype.delete = function (index, length = 1) {
-  var self = this
-
   for (var i = 0; i < length; i++) {
-    self._delete(index + 1)
+    this._delete(index)
   }
 }
 
 Logoot.prototype._delete = function (index) {
-  var self = this
+  const node = this._root.getChildByOrder(index + 1)
+  if (!node || node.id.site == null) return
 
-  const line = self._lines[index]
-  if (!line || line.value === null) return
-  self._lines.splice(index, 1)
-  self.emit('operation', { type: 'delete', line })
+  const position = node.getPath()
+  node.setEmpty(true)
+  node.trimEmpty()
+  this.emit('operation', { type: 'delete', position })
 }
 
 // construct a string from the sequence
 Logoot.prototype.value = function () {
-  var self = this
-  return self._lines.map(line => line.value).join('')
+  const arr = []
+  this._root.walk(node => {
+    if (!node.empty) arr.push(node.value)
+  })
+  return arr.join('')
 }
 
 Logoot.prototype.length = function () {
-  var self = this
-  return self._lines.length - 2
+  return this._root.size - 2
 }
 
 Logoot.prototype.replaceRange = function (value, start, length) {
-  var self = this
-
-  self.delete(start, length)
-  self.insert(value, start)
+  this.delete(start, length)
+  this.insert(value, start)
 }
 
 Logoot.prototype.setValue = function (value) {
-  var self = this
-
-  self.replaceRange(value, 0, self.value().length)
+  this.replaceRange(value, 0, this.length())
 }
 
 Logoot.prototype.getState = function () {
-  const self = this
-
   return JSON.stringify({
-    lines: self._lines,
-    deleteQueue: self._deleteQueue
-  })
+    root: this._root,
+    deleteQueue: this._deleteQueue
+  }, (key, value) => key === 'parent' ? undefined : value)
 }
 
 Logoot.prototype.setState = function (state) {
-  const self = this
-
   const parsed = JSON.parse(state)
 
-  self._lines = parsed.lines.map(parseLine)
-  self._deleteQueue = parsed.deleteQueue.map(op => {
-    return { type: op.type, line: parseLine(op.line) }
-  })
+  function parseNode (n, parent) {
+    const node = new Node(parseId(n.id), n.value)
+    node.parent = parent
+    node.children = n.children.map(c => parseNode(c, node))
+    node.size = n.size
+    node.empty = n.empty
+    return node
+  }
+
+  this._root = parseNode(parsed.root, null)
+  this._deleteQueue = parsed.deleteQueue
 }
 
 module.exports = Logoot
