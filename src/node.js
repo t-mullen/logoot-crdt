@@ -93,7 +93,7 @@ Node.prototype.getChildById = function (id) {
   return this.children[index]
 }
 
-Node.prototype.getChildByPath = function (path, build = true) {
+Node.prototype.getChildByPath = function (path, build) {
   var current = this
   var next = null
   path.every(id => {

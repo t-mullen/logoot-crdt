@@ -53,15 +53,24 @@ Logoot.prototype.receive = function (operation) {
       this._deleteQueue.splice(deleteQueueIndex, 1)
       return
     }
+    const existingNode = this._root.getChildByPath(operation.position, false)
+    if (existingNode) return // invalid duplication, ignore it
 
-    const node = this._root.getChildByPath(operation.position)
+    const node = this._root.getChildByPath(operation.position, true)
     node.value = operation.value
     node.setEmpty(false)
+    const index = node.getOrder()
+
+    this.emit('insert', { value: node.value, index })
   } else if (operation.type === 'delete') {
     const node = this._root.getChildByPath(operation.position, false)
-    if (node) {
+    if (node && !node.empty) {
+      const index = node.getOrder()
+      const value = node.value
       node.setEmpty(true)
       node.trimEmpty()
+
+      this.emit('delete', { value, index })
     } else {
       if (!this._deleteQueue.some(op => {
         return arePositionsEqual(op.position, operation.position)
@@ -78,18 +87,6 @@ Logoot.prototype.insert = function (value, index) {
   })
 }
 
-function isAtEndOfBlock (node) {
-  const index = node.parent._exactSearch(node)
-  const rightSibling = node.parent.children[index + 1]
-  return !rightSibling || rightSibling.id.site !== node.id.site
-}
-
-function isAtStartOfBlock (node) {
-  const index = node.parent._exactSearch(node)
-  const leftSibling = node.parent.children[index - 1]
-  return !leftSibling || leftSibling.id.site !== node.id.site
-}
-
 Logoot.prototype._insert = function (value, index) {
   index = Math.min(index, this.length())
 
@@ -99,63 +96,54 @@ Logoot.prototype._insert = function (value, index) {
   const prevPos = prev.getPath()
   const nextPos = next.getPath()
 
-  var position
-  if (prev.id.site === this.site && prev.id.int + 1 < doubledBase(prevPos.length - 1) && isAtEndOfBlock(prev)) {
-    position = prevPos.slice(0, -1)
-    position.push(new Identifier(prev.id.int + 1, this.site, this.clock++))
-  } else if (next.id.site === this.site && next.id.int - 1 > MIN && isAtStartOfBlock(next)) {
-    position = nextPos.slice(0, -1)
-    position.push(new Identifier(next.id.int - 1, this.site, this.clock++))
-  } else {
-    position = this._generatePositionBetween(prevPos, nextPos, value)
-  }
+  const position = this._generatePositionBetween(prevPos, nextPos)
 
-  const node = this._root.getChildByPath(position)
+  const node = this._root.getChildByPath(position, true)
   node.value = value
   node.setEmpty(false)
-
+  
   this.emit('operation', { type: 'insert', position, value })
 }
 
 function randomBiasedInt (a, b, bias) {
   return Math.floor(Math.pow(Math.random(), bias) * (b - (a + 1))) + a + 1
 }
-function randomStrat (bias) {
+function randomAlternation (bias) {
   return Math.random() > 0.5 ? bias : 1 / bias
 }
 function doubledBase (depth) {
   return Math.min(BASE * Math.pow(2, depth), MAX)
 }
 
-Logoot.prototype._generatePositionBetween = function (prevPos, nextPos, value) {
+Logoot.prototype._generateNewIdentifier = function (prevInt, nextInt) {
+  const int = randomBiasedInt(prevInt, nextInt, randomAlternation(this._bias))
+  return new Identifier(int, this.site, this.clock++)
+}
+
+Logoot.prototype._generatePositionBetween = function (prevPos, nextPos) {
   const newPos = []
 
   const maxLength = Math.max(prevPos.length, nextPos.length)
+  var samePrefixes = true
 
   for (var depth = 0; depth < maxLength + 1; depth++) {
     const DEPTH_MAX = doubledBase(depth)
     const prevId = prevPos[depth] || new Identifier(MIN, null, null)
-    const nextId = nextPos[depth] || new Identifier(DEPTH_MAX, null, null) // base doubling
+    const nextId = (samePrefixes && nextPos[depth])
+      ? nextPos[depth]
+      : new Identifier(DEPTH_MAX, null, null) // base doubling
 
     const diff = nextId.int - prevId.int
 
     if (diff > 1) { // enough room for integer between prevInt and nextInt
-      const int = randomBiasedInt(prevId.int, nextId.int, randomStrat(this._bias))
-      const id = new Identifier(int, this.site, this.clock++)
-      newPos.push(id)
+      newPos.push(this._generateNewIdentifier(prevId.int, nextId.int))
       break
-    } else if (this.site > prevId.site) { // same, but site offers more room
-      const id = new Identifier(prevId.int, this.site, this.clock++)
-      newPos.push(id)
-      break
-    } else { // no room, need to search/build next level
+    } else {
+      if (prevId.site === null && depth > 0) prevId.site === this.site
       newPos.push(prevId)
+      if (prevId.compare(nextId) !== 0) samePrefixes = false
     }
   }
-
-  // push offset
-  const DEPTH_MAX = doubledBase(depth)
-  newPos.push(new Identifier(Math.floor((DEPTH_MAX + MIN) / 2), this.site, this.clock++))
 
   return newPos
 }

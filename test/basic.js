@@ -13,6 +13,7 @@ test('single inserter', function (t) {
   w1.insert('123', 0)
   
   t.equals(w1.value(), '123abc')
+  t.equals(w1.value(), w1.getModel())
   
   t.end()
 })
@@ -31,10 +32,15 @@ test('test insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), 'x123myzabcf')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
 
+/*
+// TODO: interleaving tests
 test('test split insert', function (t) {
   var nodes = common.makeNodesWithHoldingQueue(2)
 
@@ -49,6 +55,9 @@ test('test split insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
@@ -71,9 +80,13 @@ test('test reverse split insert', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.assert(w1.value() === 'xyzabc' || w1.value() === 'abcxyz')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
+*/
 
 test('test delete', function (t) {
   var nodes = common.makeNodes(2)
@@ -90,6 +103,9 @@ test('test delete', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), 'f')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
@@ -109,6 +125,9 @@ test('test replaceRange', function (t) {
 
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), 'xyzde1456fgy')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
@@ -124,6 +143,9 @@ test('test setValue', function (t) {
   
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), 'abc')
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })
@@ -146,6 +168,11 @@ test('test delete before insert arrival', function (t) {
   t.equals(nodes[0].value(), nodes[1].value())
   t.equals(nodes[1].value(), nodes[2].value())
   t.equals(nodes[0].value(), '')
+
+  t.equals(nodes[0].value(), nodes[0].getModel())
+  t.equals(nodes[1].value(), nodes[1].getModel())
+  t.equals(nodes[2].value(), nodes[2].getModel())
+
   t.end()
 })
 
@@ -181,11 +208,12 @@ test('test randomized operations n=2', function (t) {
 
   var finalValue = nodes[0].value()
   t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+  t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
   t.end()
 })
 
 test('test randomized operations with delay n=2', function (t) {
-  t.plan(1)
+  t.plan(2)
 
   var nodes = common.makeNodesWithDelay(2)
   var rounds = 50
@@ -200,6 +228,7 @@ test('test randomized operations with delay n=2', function (t) {
   setTimeout(() => {
     var finalValue = nodes[0].value()
     t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
     t.end()
   }, 1000)
 })
@@ -217,11 +246,12 @@ test('test randomized operations n=10', function (t) {
 
   var finalValue = nodes[0].value()
   t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+  t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
   t.end()
 })
 
 test('test randomized operations with delay n=3', function (t) {
-  t.plan(1)
+  t.plan(2)
 
   var nodes = common.makeNodesWithDelay(3)
   var rounds = 1000
@@ -236,12 +266,13 @@ test('test randomized operations with delay n=3', function (t) {
   setTimeout(() => {
     var finalValue = nodes[0].value()
     t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
     t.end()
   }, 1000)
 })
 
 test('test randomized operations with delay n=10', function (t) {
-  t.plan(1)
+  t.plan(2)
 
   var nodes = common.makeNodesWithDelay(10)
   var rounds = 5
@@ -256,12 +287,13 @@ test('test randomized operations with delay n=10', function (t) {
   setTimeout(() => {
     var finalValue = nodes[0].value()
     t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
     t.end()
   }, 1000)
 })
 
 test('test random delayed repeats n=3', function (t) {
-  t.plan(1)
+  t.plan(2)
 
   var nodes = common.makeNodesWithDelayedRepeats(3)
   var rounds = 10
@@ -276,6 +308,7 @@ test('test random delayed repeats n=3', function (t) {
   setTimeout(() => {
     var finalValue = nodes[0].value()
     t.assert(!nodes.some(node => node.value() !== finalValue), 'all nodes converged')
+    t.assert(!nodes.some(node => node.value() !== node.getModel()), 'all node models converged')
     t.end()
   }, 1000)
 })
@@ -312,6 +345,9 @@ test('state transfer', function (t) {
 
   t.equals(w1.value(), w2.value())
   t.equals(w1.value(), w3.value())
+
+  t.equals(w1.value(), w1.getModel())
+  t.equals(w2.value(), w2.getModel())
   
   t.end()
 })

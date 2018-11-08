@@ -1,17 +1,21 @@
-# logoot-crdt (WIP)
+# logoot-crdt
 Replicate text or sequences over networks.
 
 Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt). 
 
-Uses the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
+Uses an optimized version of the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
 Also adds some improvements:
 - An execution readiness check for deletions.
 - LSEQ base doubling to reduce identifier integer size.
 - A hybrid of the LSEQ random and boundary allocation strategys that should work for most editing behaviours.
-- Uses Logootsplit's method to ensure concurrent edits remain contiguous.
 - Support for a 2-step initial state transfer.
 - Implemented as a tree for fast character position lookups.
+
+TODO:
+- Implement the Split optimization.
+- Implement some way of preventing Logoot's interleaving anomaly.
+- Performance benchmarks between different strategys.
 
 ## example
 ```javascript
