@@ -1,7 +1,7 @@
 # logoot-crdt
-Replicate text or sequences over networks.
+Replicate text or sequences over networks without conflicts.
 
-Allows an unlimited number of authors to collborate on text over networks. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt). 
+Allows an unlimited number of authors to seamlessly collborate on text. Has much better memory performance than [woot-crdt](https://github.com/t-mullen/woot-crdt). 
 
 Uses an optimized version of the Logoot CRDT algorithm: https://hal.inria.fr/inria-00432368/document
 
